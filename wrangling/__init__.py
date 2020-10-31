@@ -1,0 +1,2 @@
+def Log():
+    return None
