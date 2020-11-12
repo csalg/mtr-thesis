@@ -12,21 +12,18 @@ class IEstimatorWrapper(ABC):
         pass
 
     @abstractmethod
-    def predict(self, X):
+    def predict(self, X, delta):
         """
-        Loads estimator from saved model, scales X, splits if required.
-
-        Input: X, with delta in the first column, assumed to not be scaled.
+        Input: X, delta. Assumed to not be scaled.
         Output: y_pred, a vector of predicted values for the recall score.
         """
         pass
 
     @abstractmethod
-    def fit(self, X, y):
+    def fit(self, X, y, delta):
         """
-        Scales dataset and persists scaler.
-        Pre-processes X.
-        Fits model to X and y.
-        Persists model.
+        Input: X, y, delta. Assumed to not be scaled.
+        Output: None.
+        Fits scalers and estimator to X, delta and y.
         """
         pass

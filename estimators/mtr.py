@@ -2,17 +2,11 @@ from abc import ABC, abstractmethod
 from typing import Callable
 
 import numpy as np
-from sklearn.cross_decomposition import PLSRegression
-from sklearn.decomposition import PCA
-from sklearn.ensemble import BaggingRegressor
 from sklearn.linear_model import LinearRegression, HuberRegressor, ElasticNetCV, RidgeCV, LassoCV
-from sklearn.model_selection import GridSearchCV
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.preprocessing import MinMaxScaler
 
-from estimators.linear import LinearRegressionEstimator
+from estimators.IEstimatorWrapper import IEstimatorWrapper
 
 
 class IMemoryTraceFunctionalForm(ABC):
@@ -50,7 +44,7 @@ class ExponentialSqrt(IMemoryTraceFunctionalForm):
 
     @staticmethod
     def get_name():
-        return "MTR-ESq"
+        return "ESq"
 
 
 class Exponential(IMemoryTraceFunctionalForm):
@@ -67,7 +61,7 @@ class Exponential(IMemoryTraceFunctionalForm):
 
     @staticmethod
     def get_name():
-        return "MTR-Exp"
+        return "Exp"
 
 
 class Hyperbolic(IMemoryTraceFunctionalForm):
@@ -83,7 +77,7 @@ class Hyperbolic(IMemoryTraceFunctionalForm):
 
     @staticmethod
     def get_name():
-        return "MTR-Hyp"
+        return "Hyp"
 
 
 class HyperbolicSqrt(IMemoryTraceFunctionalForm):
@@ -99,7 +93,7 @@ class HyperbolicSqrt(IMemoryTraceFunctionalForm):
 
     @staticmethod
     def get_name():
-        return "MTR-HSq"
+        return "HSq"
 
 
 class HLR(IMemoryTraceFunctionalForm):
@@ -137,90 +131,70 @@ class SimplifiedWickelgren(IMemoryTraceFunctionalForm):
 
     @staticmethod
     def get_name():
-        return "MTR-SWP"
+        return "SWP"
 
 
-class MTRLinearRegression(LinearRegressionEstimator):
+class MTRLinearRegression(IEstimatorWrapper):
 
     def __init__(self,
-                 estimator_filename="LinearRegressionMuEstimator.pkl",
-                 memory_trace_functional_form: IMemoryTraceFunctionalForm = SimplifiedWickelgren,
-                 estimator_to_wrap_constructor: Callable = LinearRegression,
-                 only_delta=False,
-                 include_delta=False
-                 ):
-        super(MTRLinearRegression, self).__init__(estimator_filename)
-        self.memory_trace_functional_form = memory_trace_functional_form
-        self.estimator_to_wrap_constructor = estimator_to_wrap_constructor
-        self.only_delta = only_delta
-        self.include_delta = include_delta
+                 memory_trace_functional_form: Callable[[], IMemoryTraceFunctionalForm] = SimplifiedWickelgren,
+                 drop_delta_in_X=True,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.memory_trace_functional_form  = memory_trace_functional_form
+        self.drop_delta_in_X               = drop_delta_in_X
 
-    def fit(self, X, retention_rate, **kwargs):
-        mu = self.memory_trace_functional_form.calculate_mu(retention_rate, X['delta'])
-        self.model = self.estimator_to_wrap_constructor()
-        if self.only_delta:
-            self.model.fit(X[['delta']], mu, **kwargs)
-        elif self.include_delta:
-            self.model.fit(X, mu, **kwargs)
-        else:
+    def fit(self, X, y, delta, **kwargs):
+        # Calculate mu
+        mu = self.memory_trace_functional_form.calculate_mu(y, delta)
+
+        assert np.isfinite(X).values.all()
+        assert not np.isnan(X).values.all()
+        assert np.isfinite(mu).values.all()
+        assert not np.isnan(mu).values.all()
+
+        # Fit model
+        self.model = Pipeline([
+            ('scale', MinMaxScaler()),
+            ('estimator', LinearRegression())
+        ])
+
+        if self.drop_delta_in_X:
             self.model.fit(X.drop(['delta', ], axis=1), mu, **kwargs)
-        self._persist()
+        else:
+            self.model.fit(X, mu, **kwargs)
 
-    def partial_fit(self, X, retention_rate):
-        mu = self.memory_trace_functional_form.calculate_mu(retention_rate, X['delta'])
-        self.model = self.estimator_to_wrap_constructor()
-        self.model.partial_fit(X.drop(['delta'], axis=1), mu)
-        self._persist()
-
-    def predict(self, X, **kwargs):
+    def predict(self, X, delta, **kwargs):
         mu = self.predict_mu(X)
-        delta = X['delta']
         return self.memory_trace_functional_form.calculate_retention_rate(mu, delta)
 
     def predict_mu(self, X):
-        if self.only_delta:
-            mu = self.model.predict(X[['delta']], )
-        elif self.include_delta:
-            mu = self.model.predict(X, )
-        else:
+        if self.drop_delta_in_X:
             mu = self.model.predict(X.drop(['delta', ], axis=1), )
+        else:
+            mu = self.model.predict(X)
         return mu.reshape(len(mu))
 
     def get_name(self):
-        return self.memory_trace_functional_form.get_name()
+        form_name = self.memory_trace_functional_form.get_name()
+        if form_name == "HLR":
+            return "HLR"
+        return 'MTR-'+form_name
 
-ExpMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=Exponential)
-ESqMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=ExponentialSqrt)
-HypMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=Hyperbolic)
-HSqMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=HyperbolicSqrt)
-SWPMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=SimplifiedWickelgren)
-HLRMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=HLR)
-HLRWithDeltaMuEstimator = lambda: MTRLinearRegression(memory_trace_functional_form=HLR, include_delta=True)
+ExpMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=Exponential)
+ESqMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=ExponentialSqrt)
+HypMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=Hyperbolic)
+HSqMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=HyperbolicSqrt)
+SWPMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=SimplifiedWickelgren)
+HLRMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=HLR)
+HLRWithDeltaMTREstimator = lambda: MTRLinearRegression(memory_trace_functional_form=HLR, drop_delta_in_X=False)
 
 all_estimators = [
-    HLRMuEstimator,
-    HLRWithDeltaMuEstimator,
-    ExpMuEstimator,
-    ESqMuEstimator,
-    HypMuEstimator,
-    HSqMuEstimator,
-    SWPMuEstimator
+    HLRMTREstimator,
+    HLRWithDeltaMTREstimator,
+    ExpMTREstimator,
+    ESqMTREstimator,
+    HypMTREstimator,
+    HSqMTREstimator,
+    SWPMTREstimator
 ]
-
-class HLRForDuolingo(MTRLinearRegression):
-    def __init__(self):
-        super().__init__(memory_trace_functional_form=HLR)
-
-    def fit(self, X, retention_rate, delta=None, **kwargs):
-        mu = self.memory_trace_functional_form.calculate_mu(retention_rate, delta)
-        self.model = self.estimator_to_wrap_constructor()
-        self.model.fit(X, mu, **kwargs)
-        self._persist()
-
-    def predict(self, X, delta=None, **kwargs):
-        mu = self.predict_mu(X)
-        return self.memory_trace_functional_form.calculate_retention_rate(mu, delta)
-
-    def predict_mu(self, X):
-        mu = self.model.predict(X, )
-        return mu.reshape(len(mu))

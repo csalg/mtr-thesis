@@ -156,7 +156,7 @@ class PlotFactory:
         timesteps = [(datapoints[0]["FIRST_EXPOSURE_seconds"] + i * self.config.interval_between_points)/(24*60*60) for i in range(0, len(datapoints))]
 
         # Get y from the estimator
-        predicted_retention_rate = estimator.predict(df, )
+        predicted_retention_rate = estimator.predict(df, df['delta'])
 
         # Plot solid line using colour from config
         ax.plot(timesteps, predicted_retention_rate, color=color, linewidth=4, linestyle="-")
