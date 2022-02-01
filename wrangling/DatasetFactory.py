@@ -7,20 +7,22 @@ from typing import List, Dict, Callable
 import pandas
 
 from config import OUTLIERS_COEFFICIENT
+from types_ import DatasetConfiguration
 from wrangling.DatapointBuilder import DatapointBuilder, IDatapointBuilder
 from wrangling.domain import Log
 
 class DatasetFactory:
-    def __init__(self, builder_constructor = DatapointBuilder):
+    def __init__(self, builder_constructor = DatapointBuilder, config = DatasetConfiguration()):
         self.__logs : List[Log] = []
         self.cache = {}
         self.builder_constructor = builder_constructor
+        self.config = config
 
-    def add_logs(self, logs : List[dict], users=None):
+    def add_logs(self, logs : List[dict]):
         for log in logs:
-            should_add = users == None
-            if users != None:
-                should_add = log['user'] in users
+            should_add = True
+            if self.config.users != None:
+                should_add = log['user'] in self.config.users
             if should_add:
                 try:
                     log = Log.from_dictionary(log)
@@ -38,6 +40,7 @@ class DatasetFactory:
         return self.__create_dataframe_flattened( lambda builder : builder.view_revision_data_flattened())
 
     def create_dataframe_with_all_data_sequence(self) -> pandas.DataFrame:
+        # This is the one I actually use
         return self.__create_dataframe_sequence( lambda builder : builder.view_all_data_sequence())
 
     def create_dataframe_with_all_data_sequence_counting_text_interactions_as_clicks(self) -> pandas.DataFrame:

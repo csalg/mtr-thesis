@@ -105,7 +105,7 @@ class DatapointBuilder(IDatapointBuilder):
             datapoint['FIRST_EXPOSURE_seconds'] += datapoint['delta']
         return datapoints_for_prediction
 
-    def infer_retention_rate(self, sample_period=24 * 60 * 60, alpha=0.6):
+    def infer_retention_rate(self, sample_period=24 * 60 * 60, alpha=0.9):
         """
         Infers retention rate from the events by:
         1. Aggregating events into intervals of length `sample_period`
