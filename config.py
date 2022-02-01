@@ -6,3 +6,4 @@ OUTLIERS_COEFFICIENT = 2.5
 # Filename to use as repository pickle persistence.
 REPOSITORY_FILENAME = "repository.pkl"
 SCALER_FILENAME = "scaler.pkl"
+DEBUG = True

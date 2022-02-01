@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from wrangling.DatapointBuilder import DatapointBuilder
 from wrangling.DatasetFactory import DatasetFactory
 from types_ import DatasetConfiguration
+from lib import debug
 
 
 def load_data(config=DatasetConfiguration()):
@@ -13,14 +14,15 @@ def load_data(config=DatasetConfiguration()):
     logs    = load_logs(config)
     factory.add_logs(logs)
     df = factory.create_dataframe_with_all_data_sequence()
+    debug(df.columns)
     y  = df["inferred_retention_rate"]
     previous_recall_score  = df["previous_recall_score"]
 
-    X  = df.drop(['inferred_retention_rate', "previous_recall_score"], axis=1)
+    X  = df.drop(['inferred_retention_rate', "previous_recall_score", "user", "timestamp"], axis=1)
     return X, y, previous_recall_score, df
 
 def load_data_split(seed=10, test_size=0.1):
-    X,y,previous_recall_score, df = load_data()
+    X,y,previous_recall_score, _ = load_data()
     return train_test_split(X, y, previous_recall_score, random_state=seed, test_size=test_size)
 
 def load_logs(config=DatasetConfiguration()):

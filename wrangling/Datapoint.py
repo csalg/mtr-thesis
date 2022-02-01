@@ -24,12 +24,22 @@ class DictionaryViewWithEncapsulation:
 class CommonDatapointData(DictionaryViewWithEncapsulation):
     CLICKED: bool = True
     FIRST_EXPOSURE_seconds: int = NEVER
-    # event : str = "UNKNOWN"
+    user: str = None
+    timestamp: int = None
+
     __first_exposure_timestamp: int = 0
     __registered_a_click: int = False
 
     def update_from_log(self, log: CoreLog):
         message, timestamp = log.message, log.timestamp
+
+        if not self.timestamp:
+            self.timestamp = timestamp
+        if not self.user:
+            self.user = log.user
+        
+        if self.user != log.user:
+            print(self.user, log.user)
 
         if self.__first_exposure_timestamp == 0:
             self.__first_exposure_timestamp = timestamp

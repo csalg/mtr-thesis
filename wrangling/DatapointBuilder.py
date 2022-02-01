@@ -5,15 +5,17 @@ from abc import ABC, abstractmethod
 
 from enforce_typing import enforce_types
 
+from types_ import DatasetConfiguration
 from wrangling.Datapoint import Datapoint
 from wrangling.domain import is_click, is_recall, calculate_recall_score, Log, CoreLog
 
 
 class IDatapointBuilder(ABC):
 
-    def __init__(self, id):
+    def __init__(self, id, config = DatasetConfiguration()):
         self._id = id
         self._logs = []
+        self.config = config
 
     @classmethod
     @enforce_types
@@ -35,7 +37,7 @@ class IDatapointBuilder(ABC):
         Output: None
         """
         assert log.id() == self._id
-        self._logs.append(CoreLog(log.timestamp, log.message))
+        self._logs.append(log)
 
 
     @abstractmethod

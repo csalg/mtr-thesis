@@ -7,6 +7,7 @@ from typing import List, Dict, Callable
 import pandas
 
 from config import OUTLIERS_COEFFICIENT
+from lib import debug
 from types_ import DatasetConfiguration
 from wrangling.DatapointBuilder import DatapointBuilder, IDatapointBuilder
 from wrangling.domain import Log
@@ -21,14 +22,15 @@ class DatasetFactory:
     def add_logs(self, logs : List[dict]):
         for log in logs:
             should_add = True
-            if self.config.users != None:
+            if self.config.users is not None:
                 should_add = log['user'] in self.config.users
             if should_add:
                 try:
                     log = Log.from_dictionary(log)
                     self.__logs.append(log)
-                except:
-                    pass
+                except Exception as e:
+                    debug(e)
+        debug(f'Added {len(self.__logs)} logs')
 
     def create_dataframe_with_all_data_flattened(self) -> pandas.DataFrame:
         return self.__create_dataframe_flattened( lambda builder : builder.view_all_data_flattened())
@@ -69,8 +71,8 @@ class DatasetFactory:
         for builder in builders:
             try:
                 data.append(method_call(builder))
-            except:
-                pass
+            except Exception as e:
+                debug(e)
         return pandas.DataFrame(data)
 
 
@@ -80,8 +82,8 @@ class DatasetFactory:
         for builder in builders:
             try:
                 data += method_call(builder)
-            except:
-                pass
+            except Exception as e:
+                debug(e)
         return pandas.DataFrame(data)
 
     def create_sequence_for_rnn(self):
@@ -102,10 +104,10 @@ class DatasetFactory:
 
                 # Extend the data array with the subsequences
                 data += subsequences
-            except:
+            except Exception as e:
                 # Can throw an error if not enough data to build a datapoint,
                 # but there is no need to handle.
-                pass
+                debug(e)
             # Now we have to convert the data array into a 3rd order tensor.
 
         return data
@@ -127,9 +129,9 @@ class DatasetFactory:
             else:
                 try:
                     builders[log.id()] = self.builder_constructor.from_log(log)
-                except:
-                    pass
-        
+                except Exception as e:
+                    debug(e)
+                    
         return list(builders.values())
 
     def create_sequence_of_messages_for_rnns(self):
