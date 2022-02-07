@@ -34,7 +34,7 @@ class CommonDatapointData(DictionaryViewWithEncapsulation):
         message, timestamp = log.message, log.timestamp
 
         if not self.timestamp:
-            self.timestamp = timestamp
+            self.timestamp = log.original_timestamp # Other timestamp is subtracted when inferring score
         if not self.user:
             self.user = log.user
         
@@ -115,12 +115,6 @@ class RevisionDatapointPartition(DictionaryViewWithEncapsulation):
         self.REVISION__ALL_amount = self.REVISION__CLICKED_amount + self.REVISION__NOT_CLICKED_amount
         self.__REVISION_previous_message = message
 
-    # def __update_leading_clicks(self):
-    #     if self.__REVISION_previous_message in [TEXT__SENTENCE_READ, REVISION__NOT_CLICKED]:
-    #         self.REVISION_leading_clicks = 0
-    #     if self.__REVISION_previous_message == REVISION__CLICKED:
-    #         self.REVISION_leading_clicks += 1
-
     def update_seconds_elapsed(self, timestamp):
         # Seconds elapsed since last revision outcome
         self.REVISION__CLICKED_seconds = timestamp - self.__REVISION__CLICKED_last_timestamp
@@ -152,6 +146,125 @@ class RevisionDatapointPartition(DictionaryViewWithEncapsulation):
             self.REVISION__CLICKED_amount += 1
         if self.__REVISION_previous_message == REVISION__NOT_CLICKED:
             self.REVISION__NOT_CLICKED_amount += 1
+
+
+@enforce_types
+@dataclass
+class BookDrillDatapointPartition(DictionaryViewWithEncapsulation):
+    BOOK_DRILL_CLICK_amount : int = 0
+    BOOK_DRILL_SCROLL_amount : int = 0
+    BOOK_DRILL__ALL_amount : int = 0
+    BOOK_DRILL_CLICK_seconds : int = NEVER
+    BOOK_DRILL_SCROLL_seconds : int = NEVER
+    BOOK_DRILL__ALL_seconds : int = NEVER
+    __BOOK_DRILL__CLICK_last_timestamp : int = 0
+    __BOOK_DRILL__SCROLL_last_timestamp : int = 0
+    __BOOK_DRILL_ALL_last_timestamp : int = 0
+    __BOOK_DRILL_previous_message : str = "UNKNOWN"
+
+    def update_from_log(self, log: CoreLog):
+        message, timestamp = log.message, log.timestamp
+
+        # Base case: first log
+        if self.__BOOK_DRILL_ALL_last_timestamp == 0:
+            self.__BOOK_DRILL__CLICK_last_timestamp = timestamp
+            self.__BOOK_DRILL_ALL_last_timestamp      = timestamp
+
+        self.update_seconds_elapsed(timestamp)
+
+        if message not in [BOOK_DRILL_SCROLL, BOOK_DRILL_CLICK]:
+            return
+
+        self.__store_timestamps_for_next_iteration(message,timestamp)
+
+        if self.__BOOK_DRILL_previous_message != "UNKNOWN":
+            # Update amounts based on whether the previous revision was clicked or not.
+            self.__update_click_amounts()
+
+        self.BOOK_DRILL__ALL_amount = self.BOOK_DRILL_CLICK_amount + self.BOOK_DRILL_SCROLL_amount
+        self.__BOOK_DRILL_previous_message = message
+
+    def update_seconds_elapsed(self, timestamp):
+        # Seconds elapsed since last revision outcome
+        self.BOOK_DRILL_CLICK_seconds = timestamp - self.__BOOK_DRILL__CLICK_last_timestamp
+        self.BOOK_DRILL_SCROLL_seconds = timestamp - self.__BOOK_DRILL__SCROLL_last_timestamp \
+            if self.__BOOK_DRILL__SCROLL_last_timestamp else NEVER
+        self.REVISION__ALL_seconds = min(self.BOOK_DRILL_CLICK_seconds, self.BOOK_DRILL_SCROLL_seconds)
+
+    def __store_timestamps_for_next_iteration(self,message,timestamp):
+        if message == BOOK_DRILL_CLICK:
+            self.__BOOK_DRILL__CLICK_last_timestamp = timestamp
+        if message == BOOK_DRILL_SCROLL:
+            self.__BOOK_DRILL__SCROLL_last_timestamp = timestamp
+        self.__BOOK_DRILL_ALL_last_timestamp = timestamp
+
+    def __update_click_amounts(self):
+    # Update amounts based on whether the previous revision was clicked or not.
+        if self.__BOOK_DRILL_previous_message == REVISION__CLICKED:
+            self.BOOK_DRILL_CLICK_amount += 1
+        if self.__BOOK_DRILL_previous_message == REVISION__NOT_CLICKED:
+            self.BOOK_DRILL_SCROLL_amount += 1
+
+
+VIDEO__TRANSLATION_WAS_REVEALED = "VIDEO__TRANSLATION_WAS_REVEALED"
+VIDEO__WAS_SEEN = "VIDEO__WAS_SEEN"
+
+@enforce_types
+@dataclass
+class VideoDatapointPartition(DictionaryViewWithEncapsulation):
+    VIDEO__TRANSLATION_WAS_REVEALED_amount : int = 0
+    VIDEO__WAS_SEEN_amount : int = 0
+    VIDEO_ALL_amount : int = 0
+    VIDEO__TRANSLATION_WAS_REVEALED_seconds : int = NEVER
+    VIDEO__WAS_SEEN_seconds : int = NEVER
+    VIDEO_ALL_seconds : int = NEVER
+    __VIDEO__TRANSLATION_WAS_REVEALED_last_timestamp : int = 0
+    __VIDEO__WAS_SEEN_last_timestamp : int = 0
+    __VIDEO_ALL_last_timestamp : int = 0
+    __VIDEO_previous_message : str = "UNKNOWN"
+
+    def update_from_log(self, log: CoreLog):
+        message, timestamp = log.message, log.timestamp
+
+        # Base case: first log
+        if self.__VIDEO_ALL_last_timestamp == 0:
+            self.__VIDEO__TRANSLATION_WAS_REVEALED_last_timestamp = timestamp
+            self.__VIDEO_ALL_last_timestamp      = timestamp
+
+        self.update_seconds_elapsed(timestamp)
+
+        if message not in [VIDEO__WAS_SEEN, VIDEO__TRANSLATION_WAS_REVEALED]:
+            return
+
+        self.__store_timestamps_for_next_iteration(message,timestamp)
+
+        if self.__VIDEO_previous_message != "UNKNOWN":
+            # Update amounts based on whether the previous revision was clicked or not.
+            self.__update_click_amounts()
+
+        self.VIDEO_ALL_amount = self.VIDEO__TRANSLATION_WAS_REVEALED_amount + self.VIDEO__WAS_SEEN_amount
+        self.__VIDEO_previous_message = message
+
+    def update_seconds_elapsed(self, timestamp):
+        # Seconds elapsed since last revision outcome
+        self.VIDEO__TRANSLATION_WAS_REVEALED_seconds = timestamp - self.__VIDEO__TRANSLATION_WAS_REVEALED_last_timestamp
+        self.VIDEO__WAS_SEEN_seconds = timestamp - self.__VIDEO__WAS_SEEN_last_timestamp \
+            if self.__VIDEO__WAS_SEEN_last_timestamp else NEVER
+        self.REVISION__ALL_seconds = min(self.VIDEO__TRANSLATION_WAS_REVEALED_seconds, self.VIDEO__WAS_SEEN_seconds)
+
+    def __store_timestamps_for_next_iteration(self,message,timestamp):
+        if message == VIDEO__TRANSLATION_WAS_REVEALED:
+            self.__VIDEO__TRANSLATION_WAS_REVEALED_last_timestamp = timestamp
+        if message == VIDEO__WAS_SEEN:
+            self.__VIDEO__WAS_SEEN_last_timestamp = timestamp
+        self.__VIDEO_ALL_last_timestamp = timestamp
+
+    def __update_click_amounts(self):
+    # Update amounts based on whether the previous revision was clicked or not.
+        if self.__VIDEO_previous_message == REVISION__CLICKED:
+            self.VIDEO__TRANSLATION_WAS_REVEALED_amount += 1
+        if self.__VIDEO_previous_message == REVISION__NOT_CLICKED:
+            self.VIDEO__WAS_SEEN_amount += 1
 
 
 @enforce_types
@@ -300,11 +413,15 @@ class Datapoint:
         self.common = CommonDatapointData()
         self.reading = ReadingDatapointPartition()
         self.revision = RevisionDatapointPartition()
+        self.book_drill = BookDrillDatapointPartition()
+        # self.video = VideoDatapointPartition()
         self.all = AllDatapointPartition()
 
     def __base_update_from_log(self, log):
         self.reading.update_from_log(log)
         self.revision.update_from_log(log)
+        self.book_drill.update_from_log(log)
+        # self.video.update_from_log(log)
         self.all.update_from_log(log)
 
     def update_from_log(self, log):
@@ -319,6 +436,8 @@ class Datapoint:
         self.common.update_timestamp(timestamp)
         self.reading.update_timestamp(timestamp)
         self.revision.update_seconds_elapsed(timestamp)
+        self.book_drill.update_seconds_elapsed(timestamp)
+        # self.video.update_seconds_elapsed(timestamp)
         self.all.update_timestamp(timestamp)
 
     def view_reading_data(self):
@@ -328,5 +447,4 @@ class Datapoint:
         return {**self.common.to_dict(), **self.revision.to_dict()}
 
     def view_all_data(self):
-        # Aggregate the
-        return {**self.common.to_dict(), **self.reading.to_dict(), **self.revision.to_dict(), **self.all.to_dict()}
+        return {**self.common.to_dict(), **self.reading.to_dict(), **self.revision.to_dict(), **self.book_drill.to_dict(),  **self.all.to_dict()}

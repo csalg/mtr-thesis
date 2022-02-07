@@ -35,16 +35,17 @@ class CoreLog:
         if self.message not in VALID_LOG_MESSAGES:
             raise ValueError(f'{self.message} is not a valid log message.')
 
-
 @enforce_types
 @dataclass
 class Log(CoreLog):
     user: str
     lemma: str
+    original_timestamp: int = 0
 
     def __post_init__(self):
         if self.message not in VALID_LOG_MESSAGES:
             raise ValueError(f'{self.message} is not a valid log message.')
+        self.original_timestamp = self.timestamp
 
     @classmethod
     def from_dictionary(cls, log_dict: dict):
